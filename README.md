@@ -89,6 +89,19 @@ Skip them with `--skip_ablation`.
   (this is what allows summing the class scores over a batch before differentiating).
 * Results depend on the chosen images and seed (`--seed`); the ImageNet subset is a random sample.
 
+## Tests and sanity checks (Grad-CAM)
+
+```bash
+python -m pytest tests -q
+python gradcam_sanity.py --image <path>
+python gradcam_sanity.py --image <path> --class_a "gas pump" --class_b "jinrikisha" --out outputs/sanity
+```
+
+Details, results and a log of the problems we hit are in [GRADCAM_NOTES.md](GRADCAM_NOTES.md).
+
+**Windows:** if `run_demo.py` ends with `UnicodeEncodeError: 'charmap' codec can't encode character`,
+set `$env:PYTHONUTF8=1` in PowerShell before running.
+
 ## References
 * Selvaraju et al., *Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization*, ICCV 2017.
 * Smilkov et al., *SmoothGrad: removing noise by adding noise*, 2017.
