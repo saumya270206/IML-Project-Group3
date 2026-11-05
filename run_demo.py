@@ -193,7 +193,7 @@ def main():
         results["ablations"]["conv_layer"] = s; md += ["\n## Ablation: Grad-CAM layer", md_table(s)]
 
     json.dump(results, open(os.path.join(args.out, "metrics.json"), "w"), indent=2)
-    open(os.path.join(args.out, "metrics.md"), "w").write("\n".join(md) + "\n")
+    open(os.path.join(args.out, "metrics.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
     print(f"\nAll outputs written to {args.out}")
 
 
