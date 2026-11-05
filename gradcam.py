@@ -15,7 +15,7 @@ from utils import minmax_normalise
 
 class GradCAM:
     def __init__(self, model, target_layer):
-        """model: any nn.Module classifier; target_layer: the nn.Module whose output is A."""
+        
         self.model = model
         self.target_layer = target_layer
         self._recording = False
@@ -27,15 +27,17 @@ class GradCAM:
             self._acts = output
 
     def remove(self):
-        """Detach the forward hook (call when you are done with this object)."""
+       
         self._handle.remove()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.remove()
+
     def __call__(self, x, target=None):
-        """
-        x      : (B,3,H,W) normalised images
-        target : (B,) class indices; None -> predicted class
-        returns: (B,H,W) float map in [0,1] (detached)
-        """
+        
         was_training = self.model.training
         self.model.eval()                                   # BN in eval -> samples are independent
         x = x.detach().clone().requires_grad_(True)         # guarantees a graph even if params are frozen
@@ -43,8 +45,15 @@ class GradCAM:
         try:
             with torch.enable_grad():
                 logits = self.model(x)
+                if self._acts is None:
+                    raise RuntimeError("target_layer produced no output: it was not used in the "
+                                       "forward pass of this model")
                 if target is None:
                     target = logits.argmax(1)
+                else:                                        # accept int, list or tensor
+                    target = torch.as_tensor(target, device=logits.device).long().reshape(-1)
+                    if target.numel() == 1:
+                        target = target.expand(logits.shape[0])
                 score = logits.gather(1, target[:, None]).sum()
                 acts = self._acts                            # A, captured by the forward hook
                 grads, = torch.autograd.grad(score, acts)    # d y^c / dA
