@@ -2,6 +2,18 @@
 
 Both algorithms are implemented from scratch with plain PyTorch autograd. No XAI library (captum, pytorch-grad-cam, ...) is used. torchvision is used only for the pretrained classifier and image loading; matplotlib for plots.
 
+## Group members
+
+| Name | Roll number | Contribution |
+|------|-------------|--------------|
+| Saumya Singh | 24AI10006 | Implemented SmoothGrad from scratch along with its 32 unit tests, ran sanity checks on real images and the noise and sample-count ablations, and documented the results. |
+| Ishika Pajankar | 24AI10028 | Implemented and tested Grad-CAM, ran its sanity checks on real images, and documented the results and issues. |
+| _TODO: name_ | _TODO: roll no._ | _TODO_ |
+| _TODO: name_ | _TODO: roll no._ | _TODO_ |
+| _TODO: name_ | _TODO: roll no._ | _TODO_ |
+
+## Files
+
 | File               | Content                                                                                                          |
 |--------------------|------------------------------------------------------------------------------------------------------------------|
 | `gradcam.py`       | `GradCAM`: forward hook on the target conv layer, gradient-weighted channel averaging, ReLU, bilinear upsampling |
@@ -9,7 +21,8 @@ Both algorithms are implemented from scratch with plain PyTorch autograd. No XAI
 | `utils.py`         | ImageNet-subset loader, preprocessing, pretrained model setup, overlay helpers, Deletion/Insertion metrics       |
 | `run_demo.py`      | heatmap overlays, method comparison, quantitative evaluation, ablations                                          |
 | `gradcam_sanity.py`| sanity checks for Grad-CAM (class discrimination, model randomisation)                                           |
-| `tests/`           | unit tests for Grad-CAM                                                                                          |
+| `smoothgrad_sanity.py` | sanity checks for SmoothGrad (run-to-run agreement vs N, class discrimination, model randomisation, noise sweep) |
+| `tests/`           | unit tests for Grad-CAM (8) and SmoothGrad (32)                                                                  |
 | `requirements.txt` | dependencies                                                                                                     |
 
 ## Install
@@ -68,7 +81,7 @@ On a CPU the full default run takes a long time (SmoothGrad dominates; a 50-imag
 
 **Grad-CAM** (Selvaraju et al., 2017). For class `c` and conv activations `A` (K channels): `alpha_k = mean_{i,j} dy^c/dA^k_ij`, `CAM = ReLU(sum_k alpha_k A^k)`, upsampled to the input size. `y^c` is the pre-softmax score. Default layer: `layer4` (ResNet) or `features.29` (VGG16).
 
-**SmoothGrad** (Smilkov et al., 2017). Average the gradient saliency over `N` noisy copies of the input, `x + N(0, sigma^2)`, `sigma = noise_level * (x_max - x_min)`. Colour channels are collapsed with a max over |.|. Modes: `mean` (paper), `abs`, `square`.
+**SmoothGrad** (Smilkov et al., 2017). Average the gradient saliency over `N` noisy copies of the input, `x + N(0, sigma^2)`, `sigma = noise_level * (x_max - x_min)`. Colour channels are collapsed with a max (or sum) over |.|. Modes: `mean` (paper), `abs`, `square`. `target` can be `None` (predicted class of the clean image), an int, a list or a tensor; `seed=` makes the noise reproducible without touching the global RNG; the optional `clip_percentile` (e.g. 99) caps extreme pixels before normalising, as in the paper, for display only.
 
 **Smooth Grad-CAM** (extra). Grad-CAM averaged over noisy inputs.
 
@@ -158,15 +171,29 @@ Skip the ablations with `--skip_ablation`.
 - The model is always in `eval()` mode, so BatchNorm uses running statistics and batch samples are independent (this is what allows summing the class scores over a batch before differentiating).
 - Results depend on the chosen images and seed (`--seed`); the ImageNet subset is a random sample.
 
-## Tests and sanity checks (Grad-CAM)
+## Tests and sanity checks
 
 ```
-python -m pytest tests -q
+python -m pytest tests -q                      # 40 tests, random weights, no download
+```
+
+**Grad-CAM**
+
+```
 python gradcam_sanity.py --image <path>
 python gradcam_sanity.py --image <path> --class_a "gas pump" --class_b "jinrikisha" --out outputs/sanity
 ```
 
 Details, results and a log of the problems we hit are in [GRADCAM_NOTES.md](GRADCAM_NOTES.md).
+
+**SmoothGrad**
+
+```
+python smoothgrad_sanity.py --image <path>
+python smoothgrad_sanity.py --image <path> --class_a "gas pump" --class_b "jinrikisha" --out outputs/sanity_sg
+```
+
+The script checks (1) run-to-run agreement between two noise seeds for N = 1, 5, 10, 25, (2) class discrimination, (3) cascading model randomisation (Adebayo et al., 2018) and (4) a noise-level sweep figure. On the gas station and parachute images (ResNet-50, N = 25, noise 0.15), agreement between runs rose with N (Pearson 0.22 to 0.55 and 0.47 to 0.73), and the maps changed clearly once the backbone was randomised, with a small residual correlation as expected for gradient maps. Class-specificity was only partial (r = 0.54 and 0.80 for the chosen class pairs). These are single-image checks, not statistics. Details, all tables, the SmoothGrad ablations and the problems found and fixed are in [SMOOTHGRAD_NOTES.md](SMOOTHGRAD_NOTES.md).
 
 **Windows:** if `run_demo.py` ends with `UnicodeEncodeError: 'charmap' codec can't encode character`, set `$env:PYTHONUTF8=1` in PowerShell before running.
 
