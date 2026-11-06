@@ -62,7 +62,7 @@ python run_demo.py --fake --model resnet18 --n_eval 4 --n_demo 2 --n_abl 2 --n_s
 
 Everything is written to `./outputs`: `comparison.png`, `overlays/`, `ablation_noise.png`, `ablation_samples.png`, `ablation_layer.png`, `metrics.json`, `metrics.md`.
 
-On a CPU the full default run takes a long time (SmoothGrad dominates). A run on a MacBook Air (CPU) with `--n_eval 50 --n_demo 6 --n_abl 8 --n_samples 20` took on the order of an hour or more. Use smaller values for a quick check, or run on a GPU (e.g. a Kaggle notebook).
+On a CPU the full default run takes a long time (SmoothGrad dominates; a 50-image run on a MacBook Air CPU took roughly an hour). On a Kaggle T4 GPU the 200-image run below finished the quantitative part in about 12 minutes, so use a GPU (Kaggle or Colab) for the final numbers.
 
 ## Methods
 
@@ -84,72 +84,72 @@ No ground-truth explanation exists, so faithfulness is measured with the Deletio
 
 ## Results
 
-Setup: ResNet-50 (pretrained, torchvision), Grad-CAM on `layer4`, 50 images from an ImageNet subset (seeded random sample, `--seed 0`), SmoothGrad with 20 samples and noise 0.15, CPU. Command:
+Setup: ResNet-50 (pretrained, torchvision), Grad-CAM on `layer4`, **200 images** from the Imagenette validation set (ImageNet classes; seeded random sample), SmoothGrad with 50 samples and noise 0.15, Kaggle T4 GPU. Command:
 
 ```
-python run_demo.py --data_dir ./data/imagenet_subset --n_eval 50 --n_demo 6 --n_abl 8 --n_samples 20
+python run_demo.py --data_dir /tmp/imagenette2-160/val --n_eval 200 --n_demo 8 --n_abl 30 --n_samples 50 --noise 0.15
 ```
 
-| Method            | Deletion ↓ | Insertion ↑ | Ins − Del ↑ | sec / 100 img (CPU) |
-|-------------------|------------|-------------|-------------|---------------------|
-| Random            | 0.1223     | 0.2306      | 0.1083      | 0.02                |
-| Vanilla gradient  | 0.0811     | 0.3172      | 0.2360      | 13.50               |
-| SmoothGrad (mean) | 0.0643     | 0.4568      | 0.3925      | 273.82              |
-| SmoothGrad (abs)  | 0.0936     | 0.5432      | 0.4495      | 270.47              |
-| Grad-CAM          | 0.1087     | 0.5890      | 0.4803      | 12.30               |
-| Smooth Grad-CAM   | 0.1401     | 0.5390      | 0.3989      | 215.61              |
+| Method            | Deletion ↓ | Insertion ↑ | Ins − Del ↑ | sec / 100 img (T4 GPU) |
+|-------------------|------------|-------------|-------------|------------------------|
+| Random            | 0.1119     | 0.2163      | 0.1044      | 0.00                   |
+| Vanilla gradient  | 0.0861     | 0.2884      | 0.2023      | 0.76                   |
+| SmoothGrad (mean) | 0.0601     | 0.4241      | 0.3641      | 37.91                  |
+| SmoothGrad (abs)  | 0.0879     | 0.5011      | 0.4133      | 38.00                  |
+| Grad-CAM          | 0.1133     | 0.5464      | 0.4331      | 0.37                   |
+| Smooth Grad-CAM   | 0.1372     | 0.5080      | 0.3708      | 18.37                  |
 
-Per-image standard deviations are in `outputs/metrics.json`. Qualitative maps are in `outputs/comparison.png` and `outputs/overlays/`.
+Per-image standard deviations are in `outputs/metrics.json` (about 0.06-0.14 for Deletion and 0.18-0.29 for Insertion). Qualitative maps are in `outputs/comparison.png` and `outputs/overlays/`.
 
 What the table shows:
 
-- Every method beats Random on Insertion by a clear margin.
-- Grad-CAM has the highest Insertion and the highest Insertion − Deletion, and is about 20x faster than SmoothGrad.
-- SmoothGrad (mean) has the lowest (best) Deletion. SmoothGrad (abs) has the second-highest Insertion.
-- Grad-CAM's Deletion is close to Random. A likely, untested reason is that it comes from a coarse 7x7 grid, so deleting part of a blob leaves much of the object visible.
-- Smooth Grad-CAM does not improve on plain Grad-CAM here and costs much more time.
-- With 50 images the differences between close methods (e.g. Grad-CAM vs SmoothGrad (abs) on Ins − Del) are small compared with the per-image spread and should not be over-interpreted.
+- Every method beats Random on Insertion by a clear margin; the gradient-based maps also beat Random on Deletion, except Grad-CAM and Smooth Grad-CAM.
+- Grad-CAM has the highest Insertion (0.546) and the highest Insertion − Deletion (0.433), and is about 100x faster than SmoothGrad on the GPU.
+- SmoothGrad (mean) has the lowest (best) Deletion (0.060). SmoothGrad (abs) has the second-highest Insertion (0.501) and the second-highest Ins − Del (0.413).
+- Grad-CAM's Deletion (0.113) is indistinguishable from Random (0.112). A likely, untested reason is that it comes from a coarse 7x7 grid, so deleting the top pixels removes a blob but leaves much of the object visible.
+- Smooth Grad-CAM does not improve on plain Grad-CAM (Ins − Del 0.371 vs 0.433) and costs about 50x more time.
+- The gap between Grad-CAM and SmoothGrad (abs) on Ins − Del (0.02) is small compared with the per-image spread, so those two should be treated as comparable; the larger gaps (both vs Vanilla and Random) are reliable.
 
 ## Ablations
 
-Each ablation uses only 8 images (`--n_abl 8`), so only the large trends are reliable. Plots: `outputs/ablation_noise.png`, `outputs/ablation_samples.png`, `outputs/ablation_layer.png`.
+Each ablation uses 30 images (`--n_abl 30`), so only the larger trends are reliable. Plots: `outputs/ablation_noise.png`, `outputs/ablation_samples.png`, `outputs/ablation_layer.png`.
 
-**SmoothGrad noise level** (20 samples)
+**SmoothGrad noise level** (50 samples)
 
 | Noise | Deletion ↓ | Insertion ↑ | Ins − Del ↑ |
 |-------|------------|-------------|-------------|
-| 0.0   | 0.0904     | 0.3512      | 0.2608      |
-| 0.05  | 0.0743     | 0.4804      | 0.4061      |
-| 0.1   | 0.0724     | 0.4900      | 0.4176      |
-| 0.15  | 0.0725     | 0.5033      | 0.4308      |
-| 0.2   | 0.0639     | 0.4880      | 0.4241      |
-| 0.3   | 0.0808     | 0.3843      | 0.3035      |
-| 0.5   | 0.0739     | 0.3276      | 0.2536      |
+| 0.0   | 0.0797     | 0.3069      | 0.2272      |
+| 0.05  | 0.0785     | 0.4422      | 0.3637      |
+| 0.1   | 0.0773     | 0.4443      | 0.3670      |
+| 0.15  | 0.0705     | 0.4375      | 0.3670      |
+| 0.2   | 0.0763     | 0.4331      | 0.3568      |
+| 0.3   | 0.0774     | 0.4063      | 0.3290      |
+| 0.5   | 0.0763     | 0.3244      | 0.2481      |
 
-No noise gives the weakest maps (no smoothing), values around 0.1-0.2 work best, and too much noise (0.3-0.5) destroys the image and hurts Insertion.
+No noise (plain gradient) gives the weakest maps, there is a flat optimum for noise levels of about 0.05-0.2, and too much noise (0.3-0.5) destroys the image and hurts Insertion.
 
 **SmoothGrad sample count** (noise 0.15)
 
 | N  | Deletion ↓ | Insertion ↑ | Ins − Del ↑ |
 |----|------------|-------------|-------------|
-| 1  | 0.0787     | 0.4621      | 0.3835      |
-| 5  | 0.0667     | 0.4692      | 0.4025      |
-| 10 | 0.0680     | 0.4923      | 0.4243      |
-| 25 | 0.0772     | 0.5120      | 0.4349      |
-| 50 | 0.0768     | 0.5270      | 0.4502      |
+| 1  | 0.0705     | 0.3778      | 0.3074      |
+| 5  | 0.0631     | 0.4012      | 0.3380      |
+| 10 | 0.0612     | 0.4045      | 0.3433      |
+| 25 | 0.0622     | 0.4192      | 0.3571      |
+| 50 | 0.0733     | 0.4328      | 0.3595      |
 
-Insertion increases steadily with N, Deletion is roughly flat and noisy, and cost grows linearly with N.
+Insertion and Ins − Del increase with N but with diminishing returns beyond about 25 samples, Deletion is roughly flat and noisy, and cost grows linearly with N.
 
 **Grad-CAM target layer** (ResNet-50)
 
 | Layer  | Deletion ↓ | Insertion ↑ | Ins − Del ↑ |
 |--------|------------|-------------|-------------|
-| layer1 | 0.1757     | 0.3264      | 0.1507      |
-| layer2 | 0.1367     | 0.3324      | 0.1958      |
-| layer3 | 0.1664     | 0.4100      | 0.2436      |
-| layer4 | 0.1144     | 0.6928      | 0.5784      |
+| layer1 | 0.1514     | 0.2429      | 0.0914      |
+| layer2 | 0.1193     | 0.2506      | 0.1314      |
+| layer3 | 0.1085     | 0.3523      | 0.2438      |
+| layer4 | 0.1232     | 0.5934      | 0.4702      |
 
-Deeper layers are more class-specific but spatially coarser. `layer4` is clearly the best choice by these metrics.
+Deeper layers are more class-specific but spatially coarser. `layer4` is clearly the best choice by Insertion and Ins − Del, while `layer1` (Ins − Del 0.091) is no better than Random (0.104).
 
 Skip the ablations with `--skip_ablation`.
 
