@@ -8,7 +8,7 @@ Both algorithms are implemented from scratch with plain PyTorch autograd. No XAI
 |------|-------------|--------------|
 | Saumya Singh | 24AI10006 | Implemented SmoothGrad from scratch along with its 32 unit tests, ran sanity checks on real images and the noise and sample-count ablations, and documented the results. |
 | Ishika Pajankar | 24AI10028 | Implemented and tested Grad-CAM, ran its sanity checks on real images, and documented the results and issues. |
-| _TODO: name_ | _TODO: roll no._ | _TODO_ |
+| Yash Atul Dighade | 24AI10049 | Loaded ImageNet subset and set up ResNet-50 Pretrained model,holded overlay helpers and deletion/Insertion metrics |
 | _TODO: name_ | _TODO: roll no._ | _TODO_ |
 | _TODO: name_ | _TODO: roll no._ | _TODO_ |
 
