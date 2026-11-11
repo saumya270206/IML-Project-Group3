@@ -9,7 +9,7 @@ Both algorithms are implemented from scratch with plain PyTorch autograd. No XAI
 | Saumya Singh | 24AI10006 | Implemented SmoothGrad from scratch along with its 32 unit tests, ran sanity checks on real images and the noise and sample-count ablations, and documented the results. |
 | Ishika Pajankar | 24AI10028 | Implemented and tested Grad-CAM, ran its sanity checks on real images, and documented the results and issues. |
 | Yash Atul Dighade | 24AI10049 | Loaded ImageNet subset and set up ResNet-50 Pretrained model,holded overlay helpers and deletion/Insertion metrics |
-| _TODO: name_ | _TODO: roll no._ | _TODO_ |
+| Abhishek Kumar | 24AI10007 | Ran the full evaluation on a GPU (Kaggle T4, 200 images) with the noise, sample-count and Grad-CAM layer ablations, produced the comparison figure and overlays, and wrote the README (install and run steps, results and ablation tables). |
 | _TODO: name_ | _TODO: roll no._ | _TODO_ |
 
 ## Files
@@ -96,6 +96,8 @@ No ground-truth explanation exists, so faithfulness is measured with the Deletio
 `run_demo.py` prints a table and stores it in `outputs/metrics.md`.
 
 ## Results
+
+`outputs_full/` holds an earlier 64-image CPU run (used in `SMOOTHGRAD_NOTES.md`), and `GRADCAM_NOTES.md` quotes a 20-image CPU run. The tables below come from the final 200-image GPU run stored in `outputs/`; the trends are the same in all three runs.
 
 Setup: ResNet-50 (pretrained, torchvision), Grad-CAM on `layer4`, **200 images** from the Imagenette validation set (ImageNet classes; seeded random sample), SmoothGrad with 50 samples and noise 0.15, Kaggle T4 GPU. Command:
 
