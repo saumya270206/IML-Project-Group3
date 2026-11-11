@@ -14,18 +14,15 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 import matplotlib
 
-# ImageNet statistics used by all torchvision pretrained classifiers
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
-# model name -> torchvision weights, default Grad-CAM layer, layers for the conv-layer ablation
 MODEL_CONFIGS = {
     "resnet50": dict(weights="ResNet50_Weights.IMAGENET1K_V1", layer="layer4",
                      ablation_layers=["layer1", "layer2", "layer3", "layer4"]),
     "resnet18": dict(weights="ResNet18_Weights.IMAGENET1K_V1", layer="layer4",
                      ablation_layers=["layer1", "layer2", "layer3", "layer4"]),
-    # VGG ReLUs are in-place; we hook the ReLU *after* each conv block's last conv
     "vgg16": dict(weights="VGG16_Weights.IMAGENET1K_V1", layer="features.29",
                   ablation_layers=["features.8", "features.15", "features.22", "features.29"]),
 }
@@ -80,7 +77,9 @@ class ImageSubset(torch.utils.data.Dataset):
         return len(self.paths)
 
     def __getitem__(self, i):
-        return self.tf(Image.open(self.paths[i]).convert("RGB")), str(self.paths[i])
+        with Image.open(self.paths[i]) as image:
+            image = image.convert("RGB")
+        return self.tf(image), str(self.paths[i])
 
 
 class RandomImages(torch.utils.data.Dataset):
@@ -100,8 +99,12 @@ class RandomImages(torch.utils.data.Dataset):
 
 def load_all(ds):
     """Load a whole (small) dataset into one tensor + list of names."""
-    xs, names = zip(*[ds[i] for i in range(len(ds))])
-    return torch.stack(xs), list(names)
+    xs, names = [], []
+    for i in range(len(ds)):
+        image, name = ds[i]
+        xs.append(image)
+        names.append(name)
+    return torch.stack(xs), names
 
 
 # ----------------------------------------------------------------------------- viz
@@ -121,8 +124,8 @@ def overlay(img, cam, alpha=0.5, cmap="jet"):
 def minmax_normalise(m, eps=1e-8):
     """Per-sample min-max normalisation of a (B,H,W) map to [0,1]."""
     flat = m.flatten(1)
-    lo = flat.min(1, keepdim=True)[0]
-    hi = flat.max(1, keepdim=True)[0]
+    lo = flat.amin(1, keepdim=True)
+    hi = flat.amax(1, keepdim=True)
     return ((flat - lo) / (hi - lo + eps)).reshape_as(m)
 
 
@@ -137,15 +140,31 @@ def deletion_insertion(model, x, sal, target, steps=32, blur_k=51, blur_sigma=11
     AUC = trapezoid area under the class-probability curve, x-axis = fraction of pixels in [0,1].
     """
     B, C, H, W = x.shape
-    sal = sal + 1e-6 * torch.rand_like(sal)                     # random tie-break (Grad-CAM has many exact zeros)
-    rank = sal.flatten(1).argsort(1, descending=True).argsort(1)  # rank of every pixel (0 = most salient)
+    order = (sal.flatten(1) + 1e-6 * torch.rand_like(sal).flatten(1)).argsort(
+        1, descending=True
+    )
+    rank = torch.empty_like(order)
+    rank.scatter_(1, order, torch.arange(H * W, device=x.device).expand(B, -1))
     blurred = TF.gaussian_blur(x, [blur_k, blur_k], [blur_sigma, blur_sigma])
     zeros = torch.zeros_like(x)
+    paired_targets = target.repeat(2)
     del_p, ins_p = [], []
     for t in range(steps + 1):
         mask = (rank < int(round(t * H * W / steps))).view(B, 1, H, W)
-        pd = F.softmax(model(torch.where(mask, zeros, x)), 1).gather(1, target[:, None])[:, 0]
-        pi = F.softmax(model(torch.where(mask, x, blurred)), 1).gather(1, target[:, None])[:, 0]
-        del_p.append(pd); ins_p.append(pi)
+        if model.training:
+            deletion_input = torch.where(mask, zeros, x)
+            pd = F.softmax(model(deletion_input), 1).gather(1, target[:, None])[:, 0]
+            insertion_input = torch.where(mask, x, blurred)
+            pi = F.softmax(model(insertion_input), 1).gather(1, target[:, None])[:, 0]
+        else:
+            paired_inputs = x.new_empty((2 * B, C, H, W))
+            paired_inputs[:B].copy_(torch.where(mask, zeros, x))
+            paired_inputs[B:].copy_(torch.where(mask, x, blurred))
+            probabilities = F.softmax(model(paired_inputs), 1).gather(
+                1, paired_targets[:, None]
+            )[:, 0]
+            pd, pi = probabilities.split(B)
+        del_p.append(pd)
+        ins_p.append(pi)
     del_p, ins_p = torch.stack(del_p, 1), torch.stack(ins_p, 1)
     return torch.trapezoid(del_p, dx=1 / steps), torch.trapezoid(ins_p, dx=1 / steps)
