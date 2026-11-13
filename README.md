@@ -10,7 +10,7 @@ Both algorithms are implemented from scratch with plain PyTorch autograd. No XAI
 | Ishika Pajankar | 24AI10028 | Implemented and tested Grad-CAM, ran its sanity checks on real images, and documented the results and issues. |
 | Yash Atul Dighade | 24AI10049 | Loaded ImageNet subset and set up ResNet-50 Pretrained model,holded overlay helpers and deletion/Insertion metrics |
 | Abhishek Kumar | 24AI10007 | Ran the full evaluation on a GPU (Kaggle T4, 200 images) with the noise, sample-count and Grad-CAM layer ablations, produced the comparison figure and overlays, and wrote the README (install and run steps, results and ablation tables). |
-| Aarjav Desai | 24AI10022 | Implemented the vanilla-gradient and Random baselines, set up the repository (requirements, install steps, data instructions), and wrote this project report |
+| Aarjav Desai | 24AI10022 | Implemented the vanilla-gradient and Random baselines, set up the repository (requirements, install steps, data instructions), and wrote the project report |
 
 ## Files
 
